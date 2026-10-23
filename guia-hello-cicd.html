@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guía Hello CI/CD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Concepto: un pipeline de tres compuertas (Build, Test, Deploy) y una lista corta de pasos marcables. */
+:root {
+  --paper: #ECEFF3; --panel: #F8F9FB; --ink: #0C1424; --ink-2: #4A5568; --line: #C9D0DA;
+  --signal: #2B3AE8; --pass: #0B7F57; --fail: #CC2F2A; --warn: #A86B0A;
+  --code-bg: #0C1424; --code-ink: #DCE3F1;
+  --font-display: "Archivo", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0A0F1A; --panel: #111827; --ink: #E8ECF4; --ink-2: #98A4BA; --line: #26304A;
+    --signal: #8D99FF; --pass: #3FCB98; --fail: #FF7069; --warn: #E9B24E; --code-bg: #060A12;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0A0F1A; --panel: #111827; --ink: #E8ECF4; --ink-2: #98A4BA; --line: #26304A;
+  --signal: #8D99FF; --pass: #3FCB98; --fail: #FF7069; --warn: #E9B24E; --code-bg: #060A12;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 5rem; }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-body); line-height: 1.55; -webkit-font-smoothing: antialiased; }
+h1, h2, h3, p { margin: 0; }
+h1, h3 { font-family: var(--font-display); font-stretch: 118%; text-wrap: balance; line-height: 1.05; }
+code, pre { font-family: var(--font-mono); }
+code { font-size: 0.88em; background: color-mix(in srgb, var(--ink) 8%, transparent); padding: 0.05rem 0.3rem; border-radius: 3px; }
+a { color: var(--signal); }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--signal); outline-offset: 2px; border-radius: 3px; }
+
+.bar { position: sticky; top: 0; z-index: 5; background: var(--paper); border-bottom: 1px solid var(--line);
+  padding: 0.6rem max(1rem, env(safe-area-inset-right, 0px)) 0.6rem max(1rem, env(safe-area-inset-left, 0px)); }
+.bar-in { max-width: 46rem; margin: 0 auto; display: flex; align-items: center; gap: 0.9rem; font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink-2); }
+.bar-in b { color: var(--ink); font-weight: 500; white-space: nowrap; }
+.track { flex: 1; height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.track i { display: block; height: 100%; width: 0; background: var(--pass); transition: width 0.3s; }
+.theme { background: transparent; border: 1px solid var(--line); border-radius: 4px; padding: 0.25rem 0.55rem; font-family: var(--font-mono); font-size: 0.72rem; }
+
+main { max-width: 46rem; margin: 0 auto; padding: 2.5rem max(1rem, env(safe-area-inset-right, 0px)) 5rem max(1rem, env(safe-area-inset-left, 0px)); display: grid; gap: 1.1rem; }
+.eyebrow { font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); }
+h1 { font-size: clamp(2.2rem, 8vw, 3.6rem); font-weight: 900; font-stretch: 125%; line-height: 0.98; margin: 0.6rem 0 1rem; }
+.lede { color: var(--ink-2); font-size: 1.05rem; max-width: 40rem; }
+.gates { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 1.4rem 0 0.4rem; font-family: var(--font-mono); font-size: 0.85rem; }
+.gate { border: 2px solid var(--pass); color: var(--pass); border-radius: 4px; padding: 0.35rem 0.8rem; font-weight: 500; }
+.arrow { color: var(--ink-2); }
+
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 1rem 1.2rem; display: grid; gap: 0.7rem; }
+.box h3 { font-size: 1.05rem; }
+.box ul { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.2rem; }
+.row { display: grid; grid-template-columns: minmax(7rem, 9rem) minmax(0, 1fr); gap: 0.4rem 1rem; align-items: center; }
+.lab { font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-2); }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; width: fit-content; max-width: 100%; }
+.seg button { border: 0; background: transparent; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: 500; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+input.url { font-family: var(--font-mono); font-size: 0.85rem; padding: 0.5rem 0.65rem; border: 1px solid var(--line); border-radius: 4px; background: var(--paper); color: var(--ink); width: 100%; min-width: 0; }
+.small { font-size: 0.85rem; color: var(--ink-2); }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 1.2rem 1.3rem 1.3rem; display: grid; gap: 0.9rem; min-width: 0; }
+.card > * { min-width: 0; }
+.card.done { border-color: var(--pass); }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.8rem; }
+.head h3 { font-size: 1.2rem; flex: 1 1 13rem; }
+.num { font-family: var(--font-mono); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--signal); }
+.chk { display: inline-flex; align-items: center; gap: 0.4rem; font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-2); cursor: pointer; margin-left: auto; }
+.chk input { accent-color: var(--pass); width: 1.1rem; height: 1.1rem; margin: 0; cursor: pointer; }
+.card.done .chk { color: var(--pass); }
+.why { color: var(--ink-2); }
+.why b { color: var(--ink); }
+ol.s { margin: 0; padding-left: 1.4rem; display: grid; gap: 0.85rem; }
+ol.s li::marker { font-family: var(--font-mono); color: var(--ink-2); }
+.code { position: relative; background: var(--code-bg); color: var(--code-ink); border-radius: 5px; margin-top: 0.5rem; }
+.code pre { margin: 0; padding: 0.8rem 4.4rem 0.8rem 1rem; overflow-x: auto; font-size: 0.82rem; line-height: 1.6; }
+.code button { position: absolute; top: 0.45rem; right: 0.45rem; background: transparent; border: 1px solid #3A4663; color: var(--code-ink); border-radius: 3px; font-family: var(--font-mono); font-size: 0.68rem; padding: 0.2rem 0.5rem; }
+.code button:hover { border-color: var(--code-ink); }
+.note { border-left: 3px solid var(--pass); padding: 0.5rem 0.85rem; font-size: 0.93rem; background: color-mix(in srgb, var(--pass) 8%, transparent); border-radius: 0 4px 4px 0; }
+.note.warn { border-left-color: var(--warn); background: color-mix(in srgb, var(--warn) 9%, transparent); }
+.note.bad { border-left-color: var(--fail); background: color-mix(in srgb, var(--fail) 8%, transparent); }
+.note b:first-child { color: var(--ink); }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th, td { text-align: left; padding: 0.5rem 0.9rem 0.5rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--font-mono); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-2); font-weight: 400; }
+h2 { font-family: var(--font-display); font-stretch: 112%; font-size: 1.5rem; margin-top: 1.6rem; }
+@media (max-width: 40rem) { .row { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="bar"><div class="bar-in"><b id="meterTxt">Pasos 0 / 9</b><div class="track"><i id="meterBar"></i></div><button class="theme" id="themeBtn" type="button">Tema</button></div></div>
+
+<main>
+  <header>
+    <div class="eyebrow">Guía práctica · CI/CD con Jenkins y Docker</div>
+    <h1>Hello CI/CD</h1>
+    <p class="lede">Un proyecto mínimo: una app que dice «Hello World», un Jenkinsfile y Docker. Cada vez que subes un cambio, Jenkins lo compila, lo prueba y lo despliega solo.</p>
+    <div class="gates" aria-label="Etapas del pipeline"><span class="gate">Build</span><span class="arrow">→</span><span class="gate">Test</span><span class="arrow">→</span><span class="gate">Deploy</span></div>
+  </header>
+
+  <div class="box">
+    <h3>Antes de empezar necesitas</h3>
+    <ul>
+      <li><b>Docker Desktop</b> instalado y encendido.</li>
+      <li><b>Git</b> instalado y una <b>cuenta de GitHub</b>.</li>
+      <li>La <b>carpeta o el zip del proyecto</b> <code>hello-cicd</code> que te entregó el docente.</li>
+    </ul>
+  </div>
+
+  <div class="box" id="settings"></div>
+
+  <div id="steps"></div>
+
+  <h2>Si algo falla</h2>
+  <div class="box scroll">
+    <table>
+      <thead><tr><th>Síntoma</th><th>Qué hacer</th></tr></thead>
+      <tbody id="probs"></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var store = {
+    get: function (k, d) { try { var v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sin almacenamiento */ } }
+  };
+
+  /* tema */
+  var root = document.documentElement;
+  var theme = store.get("hello-theme", null);
+  if (theme) root.setAttribute("data-theme", theme);
+  $("#themeBtn").addEventListener("click", function () {
+    var dark = root.getAttribute("data-theme") === "dark" || (!root.getAttribute("data-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    var next = dark ? "light" : "dark";
+    root.setAttribute("data-theme", next); store.set("hello-theme", next);
+  });
+
+  /* preferencias */
+  var PLACEHOLDER = "https://github.com/TU-USUARIO/hello-cicd.git";
+  var prefs = store.get("hello-prefs", { os: /Mac|Linux|iPhone|iPad|Android/i.test(navigator.userAgent || "") ? "mac" : "win", repo: "" });
+  var done = store.get("hello-steps", {});
+  var T = function (win, mac) { return { win: win, mac: mac }; };
+  var pick = function (x) { return x !== null && typeof x === "object" && "win" in x ? (prefs.os === "win" ? x.win : x.mac) : x; };
+  var sub = function (s, forHtml) { var r = prefs.repo.trim() || PLACEHOLDER; return String(s).split("{{REPO}}").join(forHtml ? esc(r) : r); };
+  var html = function (x) { return sub(pick(x), true); };
+  var codeBox = function (c) { return '<div class="code"><pre><code>' + esc(sub(pick(c), false)) + '</code></pre><button type="button" data-copy>Copiar</button></div>'; };
+
+  function drawSettings() {
+    $("#settings").innerHTML =
+      '<div class="row"><span class="lab">Tu sistema</span><div class="seg" role="group" aria-label="Sistema operativo">' +
+      '<button type="button" id="osWin" aria-pressed="' + (prefs.os === "win") + '">Windows · PowerShell</button>' +
+      '<button type="button" id="osMac" aria-pressed="' + (prefs.os === "mac") + '">Mac o Linux · Terminal</button></div></div>' +
+      '<div class="row"><label class="lab" for="repoInput">Tu repositorio</label><input class="url" id="repoInput" type="url" placeholder="' + PLACEHOLDER + '" value="' + esc(prefs.repo) + '" autocomplete="off" spellcheck="false"></div>' +
+      '<p class="small">Pega aquí la URL del repositorio que crees en el paso 2 y los comandos se completan solos. Se guarda solo en este navegador.</p>';
+    $("#osWin").addEventListener("click", function () { prefs.os = "win"; store.set("hello-prefs", prefs); drawSettings(); drawSteps(); });
+    $("#osMac").addEventListener("click", function () { prefs.os = "mac"; store.set("hello-prefs", prefs); drawSettings(); drawSteps(); });
+    $("#repoInput").addEventListener("input", function (e) { prefs.repo = e.target.value; store.set("hello-prefs", prefs); drawSteps(); });
+  }
+
+  var steps = [
+    { n: 1, title: "Comprueba Docker y Git",
+      why: "Todo corre en contenedores de Docker y Git sube tu código a GitHub.",
+      b: [
+        { s: [
+          { h: "Abre <b>Docker Desktop</b> y espera a que diga «Engine running»." },
+          { h: T("Abre <b>PowerShell</b> (tecla Windows, escribe PowerShell y pulsa Enter).", "Abre la aplicación <b>Terminal</b>.") },
+          { h: "Ejecuta:", code: "docker version\ngit --version" }] },
+        { see: "<code>docker version</code> muestra <b>Client</b> y <b>Server</b>. Si el Server da error, Docker aún está arrancando: espera un minuto y repite." }] },
+
+    { n: 2, title: "Sube el proyecto a tu repositorio",
+      why: "Jenkins corre dentro de un contenedor y no ve las carpetas de tu equipo: necesita clonar el código desde GitHub.",
+      b: [
+        { s: [
+          { h: "En <a href=\"https://github.com/new\" target=\"_blank\" rel=\"noopener\">github.com/new</a> crea un repositorio llamado <code>hello-cicd</code>, <b>vacío</b> (sin README ni .gitignore) y público." },
+          { h: "Copia su URL (termina en <code>.git</code>) y pégala arriba, en <b>Tu repositorio</b>." },
+          { h: "Entra a la carpeta del proyecto:", code: T("cd C:\\labs\\hello-cicd\ndir", "cd ~/labs/hello-cicd\nls") },
+          { h: "Sube el contenido:", code: "git init -b main\ngit add -A\ngit commit -m \"Proyecto inicial\"\ngit remote add origin {{REPO}}\ngit push -u origin main" }] },
+        { see: "Al recargar tu repositorio en GitHub ves las carpetas <code>src</code>, <code>test</code>, <code>scripts</code> y los archivos <code>Jenkinsfile</code> y <code>Dockerfile</code>." },
+        { warn: "Si el proyecto ya trae una carpeta <code>.git</code> de otro repositorio, bórrala antes (<code>rm -rf .git</code> o, en PowerShell, <code>Remove-Item -Recurse -Force .git</code>). Si Git pide tu identidad, ejecuta <code>git config --global user.name \"Tu Nombre\"</code> y <code>git config --global user.email \"tu@correo.com\"</code> y repite el commit." }] },
+
+    { n: 3, title: "Prueba la app sin Jenkins (opcional)",
+      why: "Comprueba que Docker construye y ejecuta la app antes de automatizar nada.",
+      b: [
+        { s: [
+          { h: "Construye la imagen y ejecútala:", code: "docker build -t hello-cicd .\ndocker run --rm -p 3000:3000 hello-cicd" },
+          { h: "Abre <a href=\"http://localhost:3000\" target=\"_blank\" rel=\"noopener\">http://localhost:3000</a> y luego <a href=\"http://localhost:3000/health\" target=\"_blank\" rel=\"noopener\">/health</a>." },
+          { h: "Detén la app con <b>Ctrl + C</b>." }] },
+        { see: "La página muestra <code>Hello World desde el pipeline CI/CD</code> y <code>/health</code> responde <code>{\"status\":\"ok\"}</code>." },
+        { warn: "Detén la app antes del paso 6: el pipeline también usa el puerto 3000.", title: "Importante." }] },
+
+    { n: 4, title: "Levanta Jenkins",
+      why: "Jenkins es el servidor que ejecuta el pipeline. El proyecto trae uno preparado, con Node y el comando <code>docker</code> instalados.",
+      b: [
+        { s: [
+          { h: "Si ya tienes un contenedor llamado <code>jenkins</code>, deténlo (el nuevo usa el mismo nombre y puerto). Si el primer comando no lista ninguno, sáltate esto:", code: "docker ps --format \"{{.Names}}\"\ndocker stop jenkins\ndocker rm jenkins" },
+          { h: "Desde la carpeta del proyecto:", code: "docker compose up -d --build", note: "Tarda entre 2 y 5 minutos la primera vez." },
+          { h: "Comprueba que Jenkins tiene Docker y Node:", code: "docker exec jenkins docker --version\ndocker exec jenkins node --version" },
+          { h: "Obtén la clave inicial de administrador:", code: "docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword" },
+          { h: "Abre <a href=\"http://localhost:8080\" target=\"_blank\" rel=\"noopener\">http://localhost:8080</a> (si dice «getting ready», espera 30 segundos), pega la clave y elige <b>Install suggested plugins</b>." },
+          { h: "Crea tu usuario administrador (anótalo) y pulsa <b>Save and Continue</b>, <b>Save and Finish</b> y <b>Start using Jenkins</b>." }] },
+        { see: "El panel de Jenkins, vacío. Los dos comandos de comprobación muestran una versión de Docker y una de Node (v20)." },
+        { warn: "Si dice <code>executable file not found</code>, la imagen de Jenkins no es la correcta: repite <code>docker compose up -d --build</code> desde la carpeta del proyecto.", title: "Si falla." }] },
+
+    { n: 5, title: "Crea el job del pipeline",
+      why: "El job le dice a Jenkins de dónde sacar el código y qué archivo de pipeline ejecutar.",
+      b: [
+        { s: [
+          { h: "En el panel pulsa <b>New Item</b>, escribe <code>hello-cicd</code>, elige <b>Pipeline</b> y pulsa <b>OK</b>." },
+          { h: "Baja a la sección <b>Pipeline</b>. En <b>Definition</b> elige <b>Pipeline script from SCM</b> y en <b>SCM</b> elige <b>Git</b>." },
+          { h: "Rellena y pulsa <b>Save</b>:", code: "Repository URL:   {{REPO}}\nBranch Specifier: */main\nScript Path:      Jenkinsfile" }] },
+        { see: "La página del job, con el botón <b>Build Now</b> a la izquierda." },
+        { warn: "Si tu repositorio es privado, junto a <b>Credentials</b> pulsa <b>Add → Jenkins</b>, elige <b>Username with password</b>, usa tu usuario de GitHub y un token personal con permiso <code>repo</code> como contraseña, y selecciónalo en la lista.", title: "Repositorio privado." }] },
+
+    { n: 6, title: "Ejecuta el pipeline",
+      why: "Es el momento clave: Jenkins hace solo, en orden, lo que harías a mano.",
+      b: [
+        { s: [
+          { h: "Pulsa <b>Build Now</b>." },
+          { h: "Abre el build (#1) y luego <b>Console Output</b> para ver el avance." },
+          { h: "Cuando termine abre <a href=\"http://localhost:3000\" target=\"_blank\" rel=\"noopener\">http://localhost:3000</a>." }] },
+        { t: [["Etapa", "Qué hace"], [
+          ["<b>Build</b>", "Revisa la sintaxis del código, lo copia a <code>dist/</code> y construye la imagen de Docker"],
+          ["<b>Test</b>", "Ejecuta las pruebas automáticas (<code>npm test</code>)"],
+          ["<b>Deploy</b>", "Reemplaza el contenedor anterior por uno nuevo con la imagen recién construida"]]] },
+        { see: "<code>Finished: SUCCESS</code> en 1 a 3 minutos. En la consola aparecen <code>Build OK -&gt; dist/</code>, <code># pass 2</code> y al final <code>Pipeline OK: http://localhost:3000</code>. La página muestra «Hello World desde el pipeline CI/CD»." }] },
+
+    { n: 7, title: "Cambia el código y míralo desplegarse",
+      why: "Esto es integración y entrega continuas: un cambio en el código llega a producción sin que despliegues nada a mano.",
+      b: [
+        { s: [
+          { h: "Cambia el mensaje de la app:", code: T("(Get-Content src/app.js) -replace 'CI/CD','CI/CD v2' | Set-Content src/app.js", "sed -i.bak 's#CI/CD#CI/CD v2#' src/app.js && rm src/app.js.bak") },
+          { h: "Súbelo:", code: "git commit -am \"feat: mensaje v2\"\ngit push" },
+          { h: "En Jenkins pulsa <b>Build Now</b> y, al terminar, recarga <a href=\"http://localhost:3000\" target=\"_blank\" rel=\"noopener\">http://localhost:3000</a>." }] },
+        { see: "La página ahora dice <code>Hello World desde el pipeline CI/CD v2</code>." }] },
+
+    { n: 8, title: "Rompe una prueba a propósito",
+      why: "Demuestra para qué sirve la etapa Test: un cambio defectuoso se detiene antes de llegar a producción.",
+      b: [
+        { s: [
+          { h: "Cambia «Hello World» por «Hola Mundo», que incumple lo que la prueba espera:", code: T("(Get-Content src/app.js) -replace 'Hello World','Hola Mundo' | Set-Content src/app.js", "sed -i.bak 's#Hello World#Hola Mundo#' src/app.js && rm src/app.js.bak") },
+          { h: "Súbelo y ejecuta <b>Build Now</b>:", code: "git commit -am \"test: romper la prueba\"\ngit push" }] },
+        { see: "El build termina en <b>rojo</b> en la etapa <b>Test</b> y <b>Deploy</b> no se ejecuta. En la consola aparece la prueba fallida. La app en <code>localhost:3000</code> sigue mostrando la versión anterior: el cambio defectuoso nunca llegó a producción." },
+        { s: [
+          { h: "Deshaz el cambio y vuelve a ejecutar <b>Build Now</b>; debe volver a pasar:", code: "git revert HEAD --no-edit\ngit push" }] }] },
+
+    { n: 9, title: "Limpia al terminar",
+      why: "Deja tu equipo como estaba.",
+      b: [
+        { s: [
+          { h: "Detener sin borrar:", code: "docker stop jenkins hello-cicd-test" },
+          { h: "Borrar contenedores y datos:", code: "docker rm -f jenkins hello-cicd-test\ndocker volume rm hello-cicd_jenkins_home" }] }] }
+  ];
+
+  var probs = [
+    ["<code>docker version</code> no muestra Server", "Docker Desktop aún arranca o está apagado. Ábrelo y espera a «Engine running»."],
+    ["<code>docker: command not found</code> en el build", "El Jenkins no es el del proyecto. Repite el paso 4 con <code>docker compose up -d --build</code> y comprueba <code>docker exec jenkins docker --version</code>."],
+    ["<code>container name \"/jenkins\" is already in use</code>", "Hay otro contenedor llamado <code>jenkins</code>: <code>docker rm -f jenkins</code> y repite el paso 4."],
+    ["<code>port is already allocated</code> (3000 u 8080)", "Otro programa usa el puerto. Con <code>docker ps</code> busca el contenedor y detenlo (por ejemplo la prueba del paso 3)."],
+    ["<code>git push</code> dice <code>rejected</code>", "Tu repositorio no estaba vacío. Si no necesitas su contenido: <code>git push -u origin main --force</code>."],
+    ["Jenkins no clona el repositorio", "Revisa la URL y la rama <code>*/main</code>. Si es privado, agrega las credenciales (paso 5)."],
+    ["El build falla en Build con un error de sintaxis", "Revisa el cambio que hiciste en <code>src/app.js</code> (comillas o paréntesis) y vuelve a subirlo."],
+    ["Un build falla y no sabes por qué", "Abre <b>Console Output</b>: la última etapa en rojo indica dónde se detuvo y el mensaje justo encima explica el motivo."]
+  ];
+
+  function blockHtml(b) {
+    if (b.see) return '<div class="note"><b>Qué deberías ver.</b> ' + html(b.see) + "</div>";
+    if (b.warn) return '<div class="note warn"><b>' + (b.title || "Si falla.") + "</b> " + html(b.warn) + "</div>";
+    if (b.t) return '<div class="scroll"><table><thead><tr>' + b.t[0].map(function (h) { return "<th>" + h + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      b.t[1].map(function (r) { return "<tr>" + r.map(function (c) { return "<td>" + c + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>";
+    if (b.s) return '<ol class="s">' + b.s.map(function (x) {
+      return "<li><div>" + html(x.h) + "</div>" + (x.code ? codeBox(x.code) : "") + (x.note ? '<p class="small">' + html(x.note) + "</p>" : "") + "</li>";
+    }).join("") + "</ol>";
+    return "";
+  }
+
+  function drawSteps() {
+    $("#steps").innerHTML = steps.map(function (s) {
+      return '<article class="card' + (done[s.n] ? " done" : "") + '" id="paso-' + s.n + '" style="margin-bottom:1.1rem"><div class="head"><span class="num">Paso ' + s.n + "</span><h3>" + esc(s.title) +
+        '</h3><label class="chk"><input type="checkbox" data-n="' + s.n + '"' + (done[s.n] ? " checked" : "") + "> Hecho</label></div>" +
+        '<p class="why"><b>Para qué sirve.</b> ' + html(s.why) + "</p>" + s.b.map(blockHtml).join("") + "</article>";
+    }).join("");
+    $$("input[data-n]").forEach(function (cb) {
+      cb.addEventListener("change", function () {
+        done[cb.dataset.n] = cb.checked; store.set("hello-steps", done);
+        cb.closest(".card").classList.toggle("done", cb.checked); meter();
+      });
+    });
+    meter();
+  }
+  function meter() {
+    var all = $$("input[data-n]"), n = all.filter(function (c) { return c.checked; }).length;
+    $("#meterTxt").textContent = "Pasos " + n + " / " + all.length;
+    $("#meterBar").style.width = (100 * n / all.length) + "%";
+  }
+
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-copy]");
+    if (!b) return;
+    var el = $("code", b.parentNode);
+    var ok = function () { b.textContent = "Copiado"; setTimeout(function () { b.textContent = "Copiar"; }, 1400); };
+    var fb = function () { var r = document.createRange(); r.selectNodeContents(el); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent = "Selecciona y copia"; };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(el.textContent).then(ok, fb); else fb();
+  });
+
+  $("#probs").innerHTML = probs.map(function (r) { return "<tr><td>" + r[0] + "</td><td>" + r[1] + "</td></tr>"; }).join("");
+  drawSettings();
+  drawSteps();
+})();
+</script>
+</body>
+</html>
